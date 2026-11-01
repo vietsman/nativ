@@ -857,7 +857,7 @@ static int ensure_src_texture(uint32_t w, uint32_t h) {
 /* run fn(arg) as the game; with a window, on its own thread while this one shows frames */
 void window_run(void *(*fn)(void *), void *arg) {
 	const char *hl = getenv("RECOMP_HEADLESS");
-	if ((hl && *hl && *hl != '0') || !SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+	if ((hl && *hl && *hl != '0') || !SDL_Init(SDL_INIT_VIDEO)) {
 		if (!(hl && *hl && *hl != '0')) fprintf(stderr, "no window (%s): running headless\n", SDL_GetError());
 		/* RECOMP_GFX=gpu needs an SDL_GPUDevice even here: gfx_gpu.c never presents to a window
 		 * swapchain (window.c's own present loop below does that, for the software backend's
@@ -869,9 +869,16 @@ void window_run(void *(*fn)(void *), void *arg) {
 		fn(arg);
 		return;
 	}
+	if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
+		fprintf(stderr, "gamepad initialization failed (%s): continuing without gamepad input\n", SDL_GetError());
 	int scale = getenv("RECOMP_SCALE") ? atoi(getenv("RECOMP_SCALE")) : 1;
 	if (scale < 1) scale = 1;
 	{ const char *name = getenv("RECOMP_GAME_NAME"); win = SDL_CreateWindow(name && *name ? name : "Project Nativ", 960 * scale, 544 * scale, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY); }
+	if (!win) {
+		fprintf(stderr, "window creation failed (%s): running headless\n", SDL_GetError());
+		fn(arg);
+		return;
+	}
 	{	/* the app icon (assets/brand): the install's, as vitarecomp run names it (an AppImage's moves on every start), else
 		 * the one the build saw */
 		const char *ip = getenv("RECOMP_ICON");
